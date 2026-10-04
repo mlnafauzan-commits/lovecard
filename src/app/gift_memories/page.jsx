@@ -31,7 +31,7 @@ export default function GiftMemories() {
         minHeight: "100svh",
         display: "grid",
         placeItems: "center",
-        overflow: "hidden",
+        overflow: { xs: "visible", sm: "hidden" },
         p: { xs: 0, sm: 2.5 },
         bgcolor: "#090b10",
       }}
@@ -42,8 +42,8 @@ export default function GiftMemories() {
         sx={{
           position: "relative",
           width: { xs: "100%", sm: "min(100%, 160vh)" },
-          height: { xs: "100svh", sm: "auto" },
-          minHeight: { xs: "560px", sm: 0 },
+          height: "auto",
+          minHeight: { xs: "760px", sm: 0 },
           aspectRatio: { xs: "auto", sm: "16 / 9" },
           overflow: "hidden",
           isolation: "isolate",
@@ -111,7 +111,7 @@ export default function GiftMemories() {
           sx={{
             position: "absolute",
             zIndex: 3,
-            top: { xs: "9%", sm: "12%" },
+            top: { xs: "13%", sm: "12%" },
             left: { xs: "12%", sm: "24%" },
             minWidth: { xs: "22%", sm: "12%" },
             px: 2,
@@ -137,7 +137,7 @@ export default function GiftMemories() {
             right: { xs: "7%", sm: "5%" },
             color: "#f7f1e9",
             fontFamily: '"Brush Script MT", "Segoe Script", cursive',
-            fontSize: { xs: "clamp(52px, 16vw, 82px)", sm: "clamp(38px, 7.3vw, 112px)" },
+            fontSize: { xs: "clamp(48px, 14vw, 72px)", sm: "clamp(38px, 7.3vw, 112px)" },
             fontWeight: 400,
             fontStyle: "italic",
             lineHeight: 1,
@@ -154,8 +154,8 @@ export default function GiftMemories() {
             left: { xs: "8%", sm: "7%" },
             zIndex: 2,
             display: "flex",
-            width: { xs: "52%", sm: "44%" },
-            height: { xs: "27%", sm: "42%" },
+            width: { xs: "84%", sm: "44%" },
+            height: { xs: "20%", sm: "42%" },
             alignItems: "flex-start",
             justifyContent: "space-between",
           }}
@@ -205,7 +205,7 @@ export default function GiftMemories() {
           aria-label="Piringan hitam dekoratif"
           sx={{
             position: "absolute",
-            top: { xs: "29%", sm: "35%" },
+            top: { xs: "31%", sm: "35%" },
             left: { xs: "59%", sm: "58%" },
             zIndex: 1,
             display: "grid",
@@ -237,11 +237,11 @@ export default function GiftMemories() {
             key={photo.alt}
             sx={{
               position: "absolute",
-              top: photo.back ? { xs: "48%", sm: "38%" } : { xs: "62%", sm: "57%" },
-              right: photo.back ? { xs: "8%", sm: "8%" } : { xs: "39%", sm: "31%" },
+              top: photo.back ? { xs: "49%", sm: "38%" } : { xs: "62%", sm: "57%" },
+              right: photo.back ? { xs: "8%", sm: "8%" } : { xs: "36%", sm: "31%" },
               zIndex: photo.back ? 3 : 4,
-              width: photo.back ? { xs: "35%", sm: "23%" } : { xs: "31%", sm: "19%" },
-              height: photo.back ? { xs: "27%", sm: "47%" } : { xs: "23%", sm: "37%" },
+              width: photo.back ? { xs: "37%", sm: "23%" } : { xs: "34%", sm: "19%" },
+              height: photo.back ? { xs: "24%", sm: "47%" } : { xs: "20%", sm: "37%" },
               m: 0,
               p: { xs: "2% 2% 6%", sm: "1.2% 1.2% 3.5%" },
               bgcolor: "#f3f0e9",
@@ -264,13 +264,13 @@ export default function GiftMemories() {
           component="p"
           sx={{
             position: "absolute",
-            bottom: { xs: "7%", sm: "12%" },
+            bottom: { xs: "5%", sm: "12%" },
             left: "9%",
             zIndex: 2,
-            width: { xs: "54%", sm: "37%" },
+            width: { xs: "82%", sm: "37%" },
             color: "#e5e2dc",
             fontFamily: 'Georgia, "Times New Roman", serif',
-            fontSize: { xs: 10, sm: "clamp(7px, 0.83vw, 13px)" },
+            fontSize: { xs: 12, sm: "clamp(7px, 0.83vw, 13px)" },
             lineHeight: 1.4,
             textShadow: "0 1px 3px #000",
           }}

@@ -66,36 +66,54 @@ const TICKET_INFO = [
   ["Kursi", "Sebelah aku"],
 ];
 
-// Titik-titik jalur (koordinat viewBox 780x426)
-const POINTS = [
+// Titik-titik jalur (koordinat viewBox desktop 780x426)
+const DESKTOP_POINTS = [
   [116, 224], [116, 356], [210, 356], [210, 250], [294, 250], [294, 374],
   [380, 374], [380, 192], [440, 192], [440, 274], [600, 274], [600, 350],
 ];
 
-/* ---------- Geometri jalur ---------- */
-const SEGS = [];
-let TOTAL = 0;
-for (let i = 0; i < POINTS.length - 1; i++) {
-  const [ax, ay] = POINTS[i];
-  const [bx, by] = POINTS[i + 1];
-  const len = Math.hypot(bx - ax, by - ay);
-  SEGS.push({ ax, ay, bx, by, len, start: TOTAL });
-  TOTAL += len;
-}
-const PATH_D = "M" + POINTS.map((p) => p.join(" ")).join(" L");
-// Titik tikungan: kalau gagal, pemain kembali ke tikungan terakhir, bukan ke awal
-const CORNERS = SEGS.map((g) => g.start);
+const MOBILE_POINTS = [
+  [100, 230], [100, 326], [290, 326], [290, 390], [100, 390],
+  [100, 458], [290, 458], [290, 520], [175, 520], [175, 610], [290, 610],
+];
 
-function pointAt(s) {
-  const seg = SEGS.find((g) => s <= g.start + g.len) ?? SEGS[SEGS.length - 1];
+function createLayout(width, height, points, startAvatar, finishAvatar, avatarRadius) {
+  const segments = [];
+  let total = 0;
+  for (let i = 0; i < points.length - 1; i++) {
+    const [ax, ay] = points[i];
+    const [bx, by] = points[i + 1];
+    const len = Math.hypot(bx - ax, by - ay);
+    segments.push({ ax, ay, bx, by, len, start: total });
+    total += len;
+  }
+  return {
+    width,
+    height,
+    segments,
+    total,
+    path: "M" + points.map((point) => point.join(" ")).join(" L"),
+    corners: segments.map((segment) => segment.start),
+    startAvatar,
+    finishAvatar,
+    avatarRadius,
+  };
+}
+
+const DESKTOP_LAYOUT = createLayout(W, H, DESKTOP_POINTS, { x: 100, y: 180 }, { x: 664, y: 362 }, 44);
+const MOBILE_LAYOUT = createLayout(390, 700, MOBILE_POINTS, { x: 54, y: 230 }, { x: 336, y: 610 }, 34);
+
+function pointAt(s, layout) {
+  const { segments } = layout;
+  const seg = segments.find((segment) => s <= segment.start + segment.len) ?? segments[segments.length - 1];
   const t = Math.min(1, Math.max(0, (s - seg.start) / seg.len));
   return { x: seg.ax + (seg.bx - seg.ax) * t, y: seg.ay + (seg.by - seg.ay) * t };
 }
 
 // Titik terdekat di jalur dari (px, py), dibatasi pada rentang jarak [from, to]
-function project(px, py, from, to) {
+function project(px, py, from, to, layout) {
   let best = null;
-  for (const g of SEGS) {
+  for (const g of layout.segments) {
     const dx = g.bx - g.ax;
     const dy = g.by - g.ay;
     const t = Math.min(1, Math.max(0, ((px - g.ax) * dx + (py - g.ay) * dy) / (g.len * g.len)));
@@ -124,6 +142,8 @@ export default function GiftGame() {
   const [lives, setLives] = useState(MAX_LIVES);
   const livesRef = useRef(MAX_LIVES);
   const reduceMotion = useMediaQuery("(prefers-reduced-motion: reduce)");
+  const isMobile = useMediaQuery("(max-width:600px)");
+  const layout = isMobile ? MOBILE_LAYOUT : DESKTOP_LAYOUT;
 
   const setProg = (v) => {
     progressRef.current = v;
@@ -137,13 +157,13 @@ export default function GiftGame() {
 
   const toSvg = (e) => {
     const r = svgRef.current.getBoundingClientRect();
-    return { x: ((e.clientX - r.left) * W) / r.width, y: ((e.clientY - r.top) * H) / r.height };
+    return { x: ((e.clientX - r.left) * layout.width) / r.width, y: ((e.clientY - r.top) * layout.height) / r.height };
   };
 
   const onDown = (e) => {
     if (status === "won") return;
     const p = toSvg(e);
-    const h = pointAt(progressRef.current);
+    const h = pointAt(progressRef.current, layout);
     if (Math.hypot(p.x - h.x, p.y - h.y) > 56) return;
     dragging.current = true;
     e.currentTarget.setPointerCapture(e.pointerId);
@@ -154,7 +174,7 @@ export default function GiftGame() {
     if (!dragging.current) return;
     const p = toSvg(e);
     const cur = progressRef.current;
-    const hit = project(p.x, p.y, cur - 40, cur + LOOK_AHEAD);
+    const hit = project(p.x, p.y, cur - 40, cur + LOOK_AHEAD, layout);
 
     if (!hit || hit.d > TOLERANCE) {
       dragging.current = false;
@@ -166,16 +186,16 @@ export default function GiftGame() {
         setStatus("gameover");
       } else {
         setLivesBoth(left);
-        setProg(CORNERS.filter((c) => c <= cur).pop() ?? 0);
+        setProg(layout.corners.filter((corner) => corner <= cur).pop() ?? 0);
         setStatus("failed");
       }
       if (!reduceMotion) setShake(true);
       return;
     }
     const next = Math.max(cur, hit.s);
-    if (next >= TOTAL - 8) {
+    if (next >= layout.total - 8) {
       dragging.current = false;
-      setProg(TOTAL);
+      setProg(layout.total);
       setStatus("won");
       return;
     }
@@ -195,7 +215,7 @@ export default function GiftGame() {
     setStatus("idle");
   };
 
-  const handle = pointAt(progress);
+  const handle = pointAt(progress, layout);
   const showPulse = progress === 0 && status !== "playing" && !reduceMotion;
 
   const hint =
@@ -229,8 +249,8 @@ export default function GiftGame() {
         component="section"
         aria-label="Game Time"
         sx={{
-          width: "min(100%, 160vh)",
-          aspectRatio: `${W} / ${H}`,
+          width: isMobile ? "min(100%, 430px)" : "min(100%, 160vh)",
+          aspectRatio: `${layout.width} / ${layout.height}`,
           overflow: "hidden",
           borderRadius: { xs: 0, sm: 1 },
           boxShadow: "0 20px 70px #0009",
@@ -242,7 +262,7 @@ export default function GiftGame() {
       >
         <svg
           ref={svgRef}
-          viewBox={`0 0 ${W} ${H}`}
+          viewBox={`0 0 ${layout.width} ${layout.height}`}
           width="100%"
           height="100%"
           style={{ display: "block", touchAction: "none" }}
@@ -272,69 +292,69 @@ export default function GiftGame() {
                 <text x="96" y="62" fontSize="16">♡</text>
               </g>
             </pattern>
-            <clipPath id="boyClip"><circle cx="100" cy="180" r="44" /></clipPath>
-            <clipPath id="girlClip"><circle cx="664" cy="362" r="44" /></clipPath>
+            <clipPath id="boyClip"><circle cx={layout.startAvatar.x} cy={layout.startAvatar.y} r={layout.avatarRadius} /></clipPath>
+            <clipPath id="girlClip"><circle cx={layout.finishAvatar.x} cy={layout.finishAvatar.y} r={layout.avatarRadius} /></clipPath>
           </defs>
 
           {/* Latar */}
-          <rect width={W} height={H} fill="url(#bg)" />
-          <rect width={W} height={H} fill="url(#glow)" />
-          <rect width={W} height={H} fill="url(#scribble)" />
+          <rect width={layout.width} height={layout.height} fill="url(#bg)" />
+          <rect width={layout.width} height={layout.height} fill="url(#glow)" />
+          <rect width={layout.width} height={layout.height} fill="url(#scribble)" />
 
           {/* Header */}
-          <rect x="56" y="78" width="724" height="46" fill="#08122a" fillOpacity="0.6" />
-          <line x1="56" y1="78" x2={W} y2="78" stroke="#bcd0ee" strokeOpacity="0.18" />
-          <line x1="56" y1="124" x2={W} y2="124" stroke="#bcd0ee" strokeOpacity="0.18" />
+          <rect x={isMobile ? 18 : 56} y={isMobile ? 76 : 78} width={isMobile ? 354 : 724} height="46" fill="#08122a" fillOpacity="0.6" />
+          <line x1={isMobile ? 18 : 56} y1={isMobile ? 76 : 78} x2={isMobile ? 372 : W} y2={isMobile ? 76 : 78} stroke="#bcd0ee" strokeOpacity="0.18" />
+          <line x1={isMobile ? 18 : 56} y1={isMobile ? 122 : 124} x2={isMobile ? 372 : W} y2={isMobile ? 122 : 124} stroke="#bcd0ee" strokeOpacity="0.18" />
           <g fill="#dfe8fb" fontFamily={SERIF}>
-            <text x="20" y="62" fontSize="24">✦</text>
-            <text x="44" y="88" fontSize="14">✦</text>
-            <text x="726" y="76" fontSize="22">✦</text>
-            <text x="750" y="102" fontSize="14">✦</text>
+            <text x={isMobile ? 22 : 20} y={isMobile ? 61 : 62} fontSize="24">✦</text>
+            <text x={isMobile ? 26 : 44} y={isMobile ? 146 : 88} fontSize="14">✦</text>
+            <text x={isMobile ? 350 : 726} y={isMobile ? 61 : 76} fontSize="22">✦</text>
+            <text x={isMobile ? 354 : 750} y={isMobile ? 146 : 102} fontSize="14">✦</text>
           </g>
           <text
-            x="700"
-            y="150"
+            x={isMobile ? 356 : 700}
+            y={isMobile ? 108 : 150}
             textAnchor="end"
             fontFamily={SCRIPT}
             fontStyle="italic"
-            fontSize="88"
+            fontSize={isMobile ? 42 : 88}
             fill="#f7f1e9"
           >
             Game Time
           </text>
 
           {/* Dekorasi */}
-          <g fontFamily={SERIF} fontSize="22" role="img" aria-label={`Nyawa tersisa ${lives} dari ${MAX_LIVES}`}>
+          <g fontFamily={SERIF} fontSize={isMobile ? 24 : 22} role="img" aria-label={`Nyawa tersisa ${lives} dari ${MAX_LIVES}`}>
             {Array.from({ length: MAX_LIVES }, (_, i) => (
-              <text key={i} x={172 + i * 24} y="160" fill={i < lives ? PINK : "#9db4da"} fillOpacity={i < lives ? 1 : 0.5}>
+              <text key={i} x={(isMobile ? 28 : 172) + i * (isMobile ? 26 : 24)} y={isMobile ? 166 : 160} fill={i < lives ? PINK : "#9db4da"} fillOpacity={i < lives ? 1 : 0.5}>
                 {i < lives ? "♥" : "♡"}
               </text>
             ))}
           </g>
-          <text x="540" y="404" fontSize="22" fill="#9db4da" fillOpacity="0.85" fontFamily={SERIF}>♡♡♡</text>
-          <g fill="#e6e2da" fillOpacity="0.8" fontFamily={SERIF} fontSize="15" letterSpacing="2" fontWeight="700">
+          <text x={isMobile ? 236 : 540} y={isMobile ? 678 : 404} fontSize="22" fill="#9db4da" fillOpacity="0.85" fontFamily={SERIF}>♡♡♡</text>
+          <g display={isMobile ? "none" : undefined} fill="#e6e2da" fillOpacity="0.8" fontFamily={SERIF} fontSize="15" letterSpacing="2" fontWeight="700">
             <text x="36" y="300">GAME</text>
             <text x="36" y="320">TIME</text>
           </g>
           <text
-            x="632"
-            y="236"
+            x={isMobile ? 195 : 632}
+            y={isMobile ? 495 : 236}
             textAnchor="middle"
-            fontSize="20"
+            fontSize={isMobile ? 24 : 20}
             fill="#f4f1eb"
             fontFamily={SCRIPT}
             fontStyle="italic"
-            transform="rotate(-4 632 236)"
+            transform={`rotate(-4 ${isMobile ? 195 : 632} ${isMobile ? 495 : 236})`}
           >
             Yayy Finishh!!!
           </text>
 
           {/* Pill Start */}
-          <rect x="180" y="178" width="76" height="28" rx="14" fill="#0b0f1a" stroke="#eae6df" strokeWidth="1.5" />
-          <text x="218" y="197" textAnchor="middle" fontSize="14" fill="#fff" fontFamily={SERIF}>Start</text>
+          <rect x={isMobile ? 122 : 180} y={isMobile ? 190 : 178} width="76" height="28" rx="14" fill="#0b0f1a" stroke="#eae6df" strokeWidth="1.5" />
+          <text x={isMobile ? 160 : 218} y={isMobile ? 209 : 197} textAnchor="middle" fontSize="14" fill="#fff" fontFamily={SERIF}>Start</text>
 
           {/* Ikon controller */}
-          <g transform="translate(426 322)" fill="#1b2438" stroke="#e9e6df" strokeWidth="2" strokeLinejoin="round">
+          <g display={isMobile ? "none" : undefined} transform="translate(426 322)" fill="#1b2438" stroke="#e9e6df" strokeWidth="2" strokeLinejoin="round">
             <path d="M10 8 H38 Q50 8 52 22 L54 34 Q55 44 46 44 Q40 44 36 38 H16 Q12 44 6 44 Q-1 44 0 34 L2 22 Q4 8 10 8 Z" />
             <path d="M14 22 H24 M19 17 V27" fill="none" strokeLinecap="round" />
             <circle cx="40" cy="19" r="2.6" fill="#e9e6df" stroke="none" />
@@ -342,24 +362,24 @@ export default function GiftGame() {
           </g>
 
           {/* Jalur: dasar putus-putus + progres */}
-          <path d={PATH_D} fill="none" stroke="#fff" strokeWidth="12" strokeDasharray="26 16" strokeLinejoin="miter" />
+          <path d={layout.path} fill="none" stroke="#fff" strokeWidth="12" strokeDasharray="26 16" strokeLinejoin="miter" />
           <path
-            d={PATH_D}
-            pathLength={TOTAL}
+            d={layout.path}
+            pathLength={layout.total}
             fill="none"
             stroke="#ff9db8"
             strokeWidth="10"
             strokeLinecap="round"
             strokeLinejoin="round"
-            strokeDasharray={`${progress} ${TOTAL + 10}`}
+            strokeDasharray={`${progress} ${layout.total + 10}`}
             style={{ transition: status === "playing" ? "none" : "stroke-dasharray 0.45s ease" }}
           />
 
           {/* Avatar */}
-          <image href={BOY_PHOTO} x="56" y="136" width="88" height="88" clipPath="url(#boyClip)" preserveAspectRatio="xMidYMid slice" style={{ filter: "grayscale(1) contrast(1.05)" }} />
-          <circle cx="100" cy="180" r="46" fill="none" stroke="#f2efe8" strokeWidth="4" />
-          <image href={GIRL_PHOTO} x="620" y="318" width="88" height="88" clipPath="url(#girlClip)" preserveAspectRatio="xMidYMid slice" style={{ filter: "grayscale(1) contrast(1.05)" }} />
-          <circle cx="664" cy="362" r="46" fill="none" stroke="#f2efe8" strokeWidth="4" />
+          <image href={BOY_PHOTO} x={layout.startAvatar.x - layout.avatarRadius} y={layout.startAvatar.y - layout.avatarRadius} width={layout.avatarRadius * 2} height={layout.avatarRadius * 2} clipPath="url(#boyClip)" preserveAspectRatio="xMidYMid slice" style={{ filter: "grayscale(1) contrast(1.05)" }} />
+          <circle cx={layout.startAvatar.x} cy={layout.startAvatar.y} r={layout.avatarRadius + 2} fill="none" stroke="#f2efe8" strokeWidth="4" />
+          <image href={GIRL_PHOTO} x={layout.finishAvatar.x - layout.avatarRadius} y={layout.finishAvatar.y - layout.avatarRadius} width={layout.avatarRadius * 2} height={layout.avatarRadius * 2} clipPath="url(#girlClip)" preserveAspectRatio="xMidYMid slice" style={{ filter: "grayscale(1) contrast(1.05)" }} />
+          <circle cx={layout.finishAvatar.x} cy={layout.finishAvatar.y} r={layout.avatarRadius + 2} fill="none" stroke="#f2efe8" strokeWidth="4" />
 
           {/* Hati yang di-drag */}
           <g
